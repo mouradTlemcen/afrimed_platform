@@ -52,7 +52,7 @@ class _AddShipmentTicketPageState extends State<AddShipmentTicketPage> {
 
   // -------------------- Other Fields --------------------
   final TextEditingController _shipmentReferenceController = TextEditingController();
-  // Shipment status is not chosen by the user – default will be "shipement initiated".
+  // Shipment status is not chosen by the user – default will be "shipment initiated".
 
   // -------------------- Date Fields --------------------
   DateTime? _shipmentDate;
@@ -207,7 +207,7 @@ class _AddShipmentTicketPageState extends State<AddShipmentTicketPage> {
       "shipmentType": _selectedInternationalType,
       "shipmentReason": _selectedShipmentReason,
       "shipmentReference": _shipmentReferenceController.text.trim(),
-      "shipmentStatus": "shipement initiated", // Hardcoded default.
+      "shipmentStatus": "shipment initiated", // Hardcoded default.
       "shipmentDate": _shipmentDate != null ? Timestamp.fromDate(_shipmentDate!) : null,
       "expectedArrivalDate": _expectedArrivalDate != null ? Timestamp.fromDate(_expectedArrivalDate!) : null,
       "origin": _originController.text.trim(),

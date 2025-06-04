@@ -57,6 +57,7 @@ class _PreventiveMaintenanceProgressPageState
 
   // For the final PPM report
   String? _finalPpmReportUrl;
+  String? _finalPpmFileName;
 
   @override
   void initState() {
@@ -123,9 +124,30 @@ class _PreventiveMaintenanceProgressPageState
       final url = data['finalPpmReportUrl'] as String?;
       setState(() {
         _finalPpmReportUrl = url;
+        _finalPpmFileName =
+            url != null ? _extractFileNameFromUrl(url) : null;
       });
     } catch (e) {
       debugPrint("Error fetching finalPpmReportUrl: $e");
+    }
+  }
+
+  String _extractFileNameFromUrl(String url) {
+    try {
+      var last = Uri.parse(url).pathSegments.last;
+      last = Uri.decodeComponent(last);
+      if (last.contains('?')) {
+        last = last.split('?').first;
+      }
+      if (last.contains('/')) {
+        last = last.split('/').last;
+      }
+      if (last.contains('%2F')) {
+        last = last.split('%2F').last;
+      }
+      return last;
+    } catch (_) {
+      return 'final_ppm_report.pdf';
     }
   }
 
@@ -691,6 +713,7 @@ class _PreventiveMaintenanceProgressPageState
 
         setState(() {
           _finalPpmReportUrl = downloadUrl;
+          _finalPpmFileName = fileName;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1657,11 +1680,17 @@ class _PreventiveMaintenanceProgressPageState
 
             if (_finalPpmReportUrl != null && _finalPpmReportUrl!.isNotEmpty)
               Center(
-                child: ElevatedButton.icon(
-                  onPressed: _downloadFinalPpmReport,
-                  icon: const Icon(Icons.download),
-                  label: const Text("Download Final PPM Report"),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_finalPpmFileName ?? 'final_ppm_report.pdf'),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _downloadFinalPpmReport,
+                      icon: const Icon(Icons.download),
+                      color: Colors.orange,
+                    ),
+                  ],
                 ),
               ),
 
