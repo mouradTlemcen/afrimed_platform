@@ -49,7 +49,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
     "Tender Preparation and submission",
     "order preparation",
     "factory test",
-    "shipement",
+    "shipment",
     "site preparation",
     "installation and training",
     "commissioning",
@@ -113,18 +113,26 @@ class _AddTaskPageState extends State<AddTaskPage> {
   }
 
   /// Fetch all projects.
-  void _fetchProjects() async {
+  Future<void> _fetchProjects() async {
     setState(() => isLoadingProjects = true);
     try {
-      QuerySnapshot querySnapshot =
-      await FirebaseFirestore.instance.collection('projects').get();
+      QuerySnapshot<Map<String, dynamic>> querySnapshot =
+          await FirebaseFirestore.instance
+              .collection('projects')
+              .orderBy('Afrimed_projectId', descending: false)
+              .get();
+
       setState(() {
         projects = querySnapshot.docs.map((doc) {
-          return {"id": doc.id, "name": doc["Afrimed_projectId"] ?? "Unknown"};
+          final data = doc.data();
+          return {
+            'id': doc.id,
+            'name': data['Afrimed_projectId']?.toString() ?? 'Unknown'
+          };
         }).toList();
       });
     } catch (e) {
-      print("Error fetching projects: $e");
+      print('Error fetching projects: $e');
     } finally {
       setState(() => isLoadingProjects = false);
     }
