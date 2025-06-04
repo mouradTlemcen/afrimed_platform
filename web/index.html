@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <base href="$FLUTTER_BASE_HREF">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- Cache Control Meta Tags to prevent stale caching -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="benosafrimed">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>benosafrimed</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Disable text selection and tap highlights */
+    html, body, #flutter_container {
+      -webkit-user-select: none;    /* Chrome/Safari */
+      -moz-user-select: none;       /* Firefox */
+      -ms-user-select: none;        /* IE10+ */
+      user-select: none;            /* Standard syntax */
+
+      -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+      -webkit-touch-callout: none;              /* Remove iOS callout on long-press */
+    }
+
+    /* Override the selection color so that if any text gets selected,
+       it appears transparent (i.e. no blue background) */
+    ::selection {
+      background: transparent;
+    }
+
+    /* Remove focus outlines globally */
+    *:focus {
+      outline: 0 !important;
+      box-shadow: none !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Your Firebase initialization and other scripts go here -->
+  <script src="flutter_bootstrap.js" async></script>
+  <!-- Include any additional scripts (e.g., Google Maps API) as needed -->
+
+  <!-- Service Worker update listener with sessionStorage flag to prevent repeated reloads -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('flutter_service_worker.js').then((registration) => {
+        registration.onupdatefound = () => {
+          const installingWorker = registration.installing;
+          installingWorker?.addEventListener('statechange', () => {
+            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // Reload only once per session
+              if (!window.sessionStorage.getItem('reloadTriggered')) {
+                window.sessionStorage.setItem('reloadTriggered', 'true');
+                window.location.reload();
+              }
+            }
+          });
+        };
+      }).catch((error) => {
+        console.error('Error during service worker registration:', error);
+      });
+    }
+  </script>
+</body>
+</html>
