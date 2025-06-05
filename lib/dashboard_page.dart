@@ -32,7 +32,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   bool hasAssignedTasks = false;
 
-  final String _hardCodedVersion = "v1.1.2";
+  final String _hardCodedVersion = "v1.1.3";
   String? _versionYouSee;
   final TextEditingController _editController = TextEditingController();
   bool _hasShownOutdatedDialog = false;

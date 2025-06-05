@@ -5,8 +5,11 @@ import 'preventive_maintenance_progress_page.dart';
 
 class PreventiveMaintenanceDetailsPage extends StatefulWidget {
   final String calendarId;
-  const PreventiveMaintenanceDetailsPage({Key? key, required this.calendarId})
-      : super(key: key);
+
+  const PreventiveMaintenanceDetailsPage({
+    Key? key,
+    required this.calendarId,
+  }) : super(key: key);
 
   @override
   _PreventiveMaintenanceDetailsPageState createState() =>
@@ -15,21 +18,22 @@ class PreventiveMaintenanceDetailsPage extends StatefulWidget {
 
 class _PreventiveMaintenanceDetailsPageState
     extends State<PreventiveMaintenanceDetailsPage> {
+  // ---------- state ----------
   List<Map<String, dynamic>> scheduleDates = [];
   bool isLoading = true;
 
-  /// We'll store whether the main doc has a non-empty finalPpmReportUrl
-  String _finalUrl = '';
-  bool _hasFinalUrl = false;
+  /// Set of keys “yyyy-MM-dd” that already have ≥1 progress doc
+  Set<String> _reportedDateKeys = {};
 
+  // ---------- life-cycle ----------
   @override
   void initState() {
     super.initState();
     _fetchCalendarDetails();
   }
 
-  /// Fetch the main doc from Firestore => build scheduleDates list,
-  /// also read finalPpmReportUrl from the same doc.
+  // ---------- Firestore  ----------
+  /// 1) main calendar doc
   Future<void> _fetchCalendarDetails() async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -44,170 +48,171 @@ class _PreventiveMaintenanceDetailsPageState
 
       final data = doc.data() as Map<String, dynamic>? ?? {};
 
-      // Read the finalUrl from the main doc
-      _finalUrl = data['finalPpmReportUrl'] as String? ?? '';
-      _hasFinalUrl = _finalUrl.isNotEmpty;
-
       final rawList = data['scheduleDates'] as List<dynamic>? ?? [];
-      final newList = <Map<String, dynamic>>[];
+      final List<Map<String, dynamic>> newList = [];
 
       for (var item in rawList) {
         if (item is Timestamp) {
-          // old shape
           newList.add({
-            "originalDate": item,
-            "date": item,
-            "modified": false,
-            "reason": "",
+            'originalDate': item,
+            'date'        : item,
+            'modified'    : false,
+            'reason'      : '',
           });
         } else if (item is Map<String, dynamic>) {
-          final ts = item["date"] as Timestamp?;
-          if (ts == null) continue;
-          final originalTs = item["originalDate"] as Timestamp? ?? ts;
-          final modified = item["modified"] as bool? ?? false;
-          final reason = item["reason"] as String? ?? "";
-          newList.add({
-            "originalDate": originalTs,
-            "date": ts,
-            "modified": modified,
-            "reason": reason,
-          });
+          final ts        = item['date']         as Timestamp?;
+          final original  = item['originalDate'] as Timestamp? ?? ts;
+          final modified  = item['modified']     as bool?      ?? false;
+          final reason    = item['reason']       as String?    ?? '';
+          if (ts != null) {
+            newList.add({
+              'originalDate': original,
+              'date'        : ts,
+              'modified'    : modified,
+              'reason'      : reason,
+            });
+          }
         }
       }
 
       setState(() {
         scheduleDates = newList;
-        isLoading = false;
+        isLoading     = false;
       });
+
+      await _fetchReportedDates();      // fetch progress list
     } catch (e) {
-      debugPrint("Error fetching calendar details: $e");
+      debugPrint('Error fetching calendar details: $e');
       setState(() => isLoading = false);
     }
   }
 
-  /// Save updated scheduleDates to Firestore
-  Future<void> _saveScheduleDatesToFirestore() async {
+  /// 2) gather all reported dates
+  Future<void> _fetchReportedDates() async {
     try {
-      await FirebaseFirestore.instance
+      final snap = await FirebaseFirestore.instance
           .collection('preventive_maintenance')
           .doc(widget.calendarId)
-          .update({'scheduleDates': scheduleDates});
+          .collection('progress')
+          .get();
+
+      final keys = <String>{};
+      for (final p in snap.docs) {
+        final ts = p['scheduledDate'] as Timestamp?;
+        if (ts != null) {
+          keys.add(DateFormat('yyyy-MM-dd').format(ts.toDate()));
+        }
+      }
+      setState(() => _reportedDateKeys = keys);
     } catch (e) {
-      debugPrint("Error saving updated dates: $e");
+      debugPrint('Error fetching reported dates: $e');
     }
   }
 
-  /// Let user pick a new date + reason => store in 'date', keep 'originalDate'
+  // ---------- edit single date ----------
   Future<void> _editScheduledDate(int index) async {
     final oldItem = scheduleDates[index];
-    final oldDate = (oldItem["date"] as Timestamp).toDate();
+    final oldDate = (oldItem['date'] as Timestamp).toDate();
 
-    final pickedDate = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: oldDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2050),
     );
-    if (pickedDate == null) return;
-
-    if (pickedDate == oldDate) return;
+    if (picked == null || picked == oldDate) return;
 
     final reason = await showDialog<String>(
       context: context,
       builder: (_) {
-        final reasonCtrl = TextEditingController();
+        final c = TextEditingController();
         return AlertDialog(
-          title: const Text("Reason for date change"),
+          title: const Text('Reason for date change'),
           content: TextField(
-            controller: reasonCtrl,
-            decoration: const InputDecoration(hintText: "Enter reason..."),
+            controller: c,
+            decoration: const InputDecoration(hintText: 'Enter reason…'),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context, reasonCtrl.text.trim());
-              },
-              child: const Text("Save"),
+              onPressed: () => Navigator.pop(context, c.text.trim()),
+              child: const Text('Save'),
             ),
           ],
         );
       },
     );
-
-    if (reason == null) {
-      return; // user canceled reason
-    }
+    if (reason == null) return;
 
     setState(() {
-      scheduleDates[index]["date"] = Timestamp.fromDate(pickedDate);
-      scheduleDates[index]["modified"] = true;
-      scheduleDates[index]["reason"] = reason;
+      scheduleDates[index]['date']     = Timestamp.fromDate(picked);
+      scheduleDates[index]['modified'] = true;
+      scheduleDates[index]['reason']   = reason;
     });
-    await _saveScheduleDatesToFirestore();
-
-    // If you want to also update a progress doc or do something else,
-    // you can do it here. But for a single finalPpmReportUrl in the main doc,
-    // there's nothing more to do.
+    await FirebaseFirestore.instance
+        .collection('preventive_maintenance')
+        .doc(widget.calendarId)
+        .update({'scheduleDates': scheduleDates});
   }
 
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Calendar Details"),
+        title: const Text('Calendar Details'),
         backgroundColor: const Color(0xFF003366),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : (scheduleDates.isEmpty)
-          ? const Center(child: Text("No scheduled dates found."))
+          : scheduleDates.isEmpty
+          ? const Center(child: Text('No scheduled dates found.'))
           : ListView.builder(
         itemCount: scheduleDates.length,
         itemBuilder: (context, index) {
-          final item = scheduleDates[index];
-          final currentDateTs = item["date"] as Timestamp;
-          final isModified = item["modified"] as bool? ?? false;
-          final reason = item["reason"] as String? ?? "";
-          final currentDate = currentDateTs.toDate();
+          final item         = scheduleDates[index];
+          final tsCurrent    = item['date']     as Timestamp;
+          final isModified   = item['modified'] as bool? ?? false;
+          final reason       = item['reason']   as String? ?? '';
+          final currentDate  = tsCurrent.toDate();
+          final dateKey      = DateFormat('yyyy-MM-dd').format(currentDate);
 
-          // If not modified, just display "Scheduled Date: XXX"
-          // If modified, show original + reason
+          //---------------- label ----------------
           String label;
           if (!isModified) {
-            label = "Scheduled Date: "
-                "${DateFormat('yyyy-MM-dd').format(currentDate)}";
+            label =
+            'Scheduled Date: ${DateFormat('yyyy-MM-dd').format(currentDate)}';
           } else {
-            final originalTs = item["originalDate"] as Timestamp;
-            final originalDate = originalTs.toDate();
-            final originalDateStr =
-            DateFormat('yyyy-MM-dd').format(originalDate);
-            final currentDateStr =
+            final tsOrig   = item['originalDate'] as Timestamp;
+            final origDate = tsOrig.toDate();
+            final origStr  =
+            DateFormat('yyyy-MM-dd').format(origDate);
+            final currStr  =
             DateFormat('yyyy-MM-dd').format(currentDate);
             label = reason.isNotEmpty
-                ? "Originally: $originalDateStr, now: $currentDateStr (reason: $reason)"
-                : "Originally: $originalDateStr, now: $currentDateStr (modified)";
+                ? 'Originally: $origStr, now: $currStr (reason: $reason)'
+                : 'Originally: $origStr, now: $currStr (modified)';
           }
 
-          // If date is in the past and there's NO final URL => red
-          final now = DateTime.now();
-          final isBeforeToday = currentDate.isBefore(
-            DateTime(now.year, now.month, now.day),
+          //---------------- colour logic ----------------
+          final today      = DateTime.now();
+          final isPastDate = currentDate.isBefore(
+            DateTime(today.year, today.month, today.day),
           );
+          final hasReport  = _reportedDateKeys.contains(dateKey);
 
-          Color textColor = Colors.black;
-          if (isBeforeToday && !_hasFinalUrl) {
-            textColor = Colors.red;
+          Color textColor = Colors.black;   // default → upcoming
+          if (isPastDate) {
+            textColor = hasReport ? Colors.green : Colors.red;
+            if (!hasReport) label = '$label – No report yet';
           }
 
           return Card(
             margin: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
+                horizontal: 16, vertical: 8),
             child: ListTile(
               title: Text(label, style: TextStyle(color: textColor)),
               trailing: Row(
@@ -222,18 +227,18 @@ class _PreventiveMaintenanceDetailsPageState
                 ],
               ),
               onTap: () async {
-                // If you want to open a "progress" page, you can do so,
-                // but note that you're no longer reading or updating
-                // any finalPpmReportUrl from the subcollection.
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => PreventiveMaintenanceProgressPage(
-                      calendarId: widget.calendarId,
+                      calendarId   : widget.calendarId,
                       scheduledDate: currentDate,
                     ),
                   ),
                 );
+                // After returning, refresh report list & colours
+                await _fetchReportedDates();
+                setState(() {});
               },
             ),
           );

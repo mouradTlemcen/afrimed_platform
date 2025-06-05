@@ -276,51 +276,75 @@ class _PreventiveMaintenanceProgressPageState
   // ------------------------------------------------------------
   // Build UI from a "flat" installedServiceKit array
   // ------------------------------------------------------------
+  // ------------------------------------------------------------
+// Build UI from a "flat" installedServiceKit array
+// + inject one synthetic item: "All the <equipment-name>"
+// ------------------------------------------------------------
   void _buildUIFromInstalledKit(List<dynamic> installedArray) {
     final Map<String, List<Map<String, dynamic>>> grouped = {};
 
+    // 1) regroup real spare-parts by kitName
     for (var entry in installedArray) {
       if (entry is Map<String, dynamic>) {
-        final kitName = entry['kitName']?.toString() ?? "Unknown Kit";
-        final itemName = entry['itemName']?.toString() ?? "Unnamed";
-        final oldBrand = entry['brand']?.toString() ?? "";
-        final oldModel = entry['model']?.toString() ?? "";
+        final kitName   = entry['kitName']?.toString() ?? "Unknown Kit";
+        final itemName  = entry['itemName']?.toString() ?? "Unnamed";
+        final oldBrand  = entry['brand']?.toString() ?? "";
+        final oldModel  = entry['model']?.toString() ?? "";
         final oldSerial = entry['serialNumber']?.toString() ?? "";
 
-        if (!grouped.containsKey(kitName)) {
-          grouped[kitName] = [];
-        }
+        grouped.putIfAbsent(kitName, () => []);
         grouped[kitName]!.add({
-          'name': itemName,
-          'checked': false,
-          'operationType': operationTypes.first,
-          'comment': '',
-          'pickedImages': <Map<String, dynamic>>[], // Each map: { 'image': XFile, 'comment': String }
-
-
-          // old => readOnly if non-empty
-          'oldSerialNumber': oldSerial,
-          'newSerialNumber': '',
-          'oldBrand': oldBrand,
-          'newBrand': '',
-          'oldModel': oldModel,
-          'newModel': '',
+          'name'            : itemName,
+          'checked'         : false,
+          'operationType'   : operationTypes.first,
+          'comment'         : '',
+          'pickedImages'    : <Map<String, dynamic>>[],
+          'oldSerialNumber' : oldSerial,
+          'newSerialNumber' : '',
+          'oldBrand'        : oldBrand,
+          'newBrand'        : '',
+          'oldModel'        : oldModel,
+          'newModel'        : '',
         });
       }
     }
 
-    final newKitsData = <Map<String, dynamic>>[];
-    for (var kName in grouped.keys) {
+    // 2) convert to list<Map> → "_serviceKitsData"
+    final List<Map<String, dynamic>> newKitsData = [];
+
+    for (final kName in grouped.keys) {
       newKitsData.add({
-        'kitName': kName,
-        'items': grouped[kName],
+        'kitName' : kName,
+        'items'   : grouped[kName],
       });
     }
+
+    // 3) inject a synthetic “whole equipment” line at the TOP
+    final eqLabel = _eqDocIdToLabel[selectedEquipmentDocId] ?? 'Equipment';
+    newKitsData.insert(0, {
+      'kitName' : 'General',
+      'items'   : [
+        {
+          'name'            : 'All the $eqLabel',
+          'checked'         : false,
+          'operationType'   : operationTypes.first,
+          'comment'         : '',
+          'pickedImages'    : <Map<String, dynamic>>[],
+          'oldSerialNumber' : '',
+          'newSerialNumber' : '',
+          'oldBrand'        : '',
+          'newBrand'        : '',
+          'oldModel'        : '',
+          'newModel'        : '',
+        }
+      ],
+    });
 
     setState(() {
       _serviceKitsData = newKitsData;
     });
   }
+
 
   // ------------------------------------------------------------
   // 4) Pick an image for a specific item
