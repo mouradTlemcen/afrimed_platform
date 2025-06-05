@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-#
-# Codex setup script: installs Flutter (stable) so dart/flutter commands work
 set -e
 
 echo "🔧  Installing system packages…"
-apt-get update -qq
-DEBIAN_FRONTEND=noninteractive apt-get install -yq \
-  git curl unzip xz-utils zip libglu1-mesa
 
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -yq \
+    git curl unzip xz-utils zip libstdc++ libglu1-mesa
+elif command -v apk >/dev/null 2>&1; then
+  apk update
+  apk add --no-cache \
+    git curl unzip xz zip libstdc++ mesa-glu
+else
+  echo "⚠️  No apt-get or apk found; assuming git & curl already present."
+fi
 echo "📦  Cloning Flutter (stable)…"
 git clone --depth 1 --branch stable \
   https://github.com/flutter/flutter.git /opt/flutter
