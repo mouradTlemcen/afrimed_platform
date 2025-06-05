@@ -1,0 +1,3 @@
+# Tell ChatGPT Codex exactly which setup script to run
+setup:
+  script: .codex/setup.sh
