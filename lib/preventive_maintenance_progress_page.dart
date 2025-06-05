@@ -114,18 +114,41 @@ class _PreventiveMaintenanceProgressPageState
   // ------------------------------------------------------------
   Future<void> _fetchFinalPpmReportUrl() async {
     try {
-      final pmDoc = await FirebaseFirestore.instance
+      final schedTs = Timestamp.fromDate(widget.scheduledDate);
+
+      // 1) Try to find a progress doc for this date that contains a final URL
+      final progSnap = await FirebaseFirestore.instance
           .collection('preventive_maintenance')
           .doc(widget.calendarId)
+          .collection('progress')
+          .where('scheduledDate', isEqualTo: schedTs)
           .get();
-      if (!pmDoc.exists) return;
 
-      final data = pmDoc.data() as Map<String, dynamic>? ?? {};
-      final url = data['finalPpmReportUrl'] as String?;
+      String? url;
+      for (final doc in progSnap.docs) {
+        final data = doc.data() as Map<String, dynamic>? ?? {};
+        final candidate = data['finalPpmReportUrl'] as String?;
+        if (candidate != null && candidate.isNotEmpty) {
+          url = candidate;
+          break;
+        }
+      }
+
+      // 2) Fallback to the main document if nothing specific for this date
+      if (url == null) {
+        final pmDoc = await FirebaseFirestore.instance
+            .collection('preventive_maintenance')
+            .doc(widget.calendarId)
+            .get();
+        if (pmDoc.exists) {
+          final data = pmDoc.data() as Map<String, dynamic>? ?? {};
+          url = data['finalPpmReportUrl'] as String?;
+        }
+      }
+
       setState(() {
         _finalPpmReportUrl = url;
-        _finalPpmFileName =
-            url != null ? _extractFileNameFromUrl(url) : null;
+        _finalPpmFileName = url != null ? _extractFileNameFromUrl(url) : null;
       });
     } catch (e) {
       debugPrint("Error fetching finalPpmReportUrl: $e");
@@ -710,6 +733,18 @@ class _PreventiveMaintenanceProgressPageState
             .collection('preventive_maintenance')
             .doc(widget.calendarId)
             .update({'finalPpmReportUrl': downloadUrl});
+
+        // Also store this URL in a progress document for the selected date
+        await FirebaseFirestore.instance
+            .collection('preventive_maintenance')
+            .doc(widget.calendarId)
+            .collection('progress')
+            .add({
+          'scheduledDate': Timestamp.fromDate(widget.scheduledDate),
+          'timestamp': Timestamp.now(),
+          'finalPpmReportUrl': downloadUrl,
+          // We do not add changed items here. This doc only stores the final report.
+        });
 
         setState(() {
           _finalPpmReportUrl = downloadUrl;
